@@ -10,7 +10,8 @@ const all = await files(root);
 const htmlFiles = all.filter(file => file.endsWith('.html'));
 for (const file of htmlFiles) {
   const html = await readFile(file, 'utf8');
-  assert.match(html, /lang="zh-CN"/, file);
+  const english = path.relative(root, file).startsWith(`en${path.sep}`);
+  assert.match(html, english ? /lang="en"/ : /lang="zh-CN"/, file);
   assert.ok(!html.includes('katex-error'), `Formula rendering error: ${file}`);
   for (const [, attr, value] of html.matchAll(/\b(href|src)="([^"]+)"/g)) {
     if (!value.startsWith('/') || value.startsWith('//')) continue;
@@ -23,9 +24,14 @@ for (const file of htmlFiles) {
   }
 }
 const search = JSON.parse(await readFile(path.join(root, 'search-index.json'), 'utf8'));
+const englishSearch = JSON.parse(await readFile(path.join(root, 'en/search-index.json'), 'utf8'));
+assert.equal(englishSearch.length, search.length, 'Chinese and English article counts differ');
+for (const entry of englishSearch) assert.ok(entry.url.startsWith(`${base}/en/posts/`), 'Incorrect English article URL');
 assert.ok(search.length > 0, 'Search index is empty');
 for (const entry of search) assert.ok(entry.url.startsWith(`${base}/posts/`), 'Incorrect search URL');
 const rss = await readFile(path.join(root, 'rss.xml'), 'utf8');
+const englishRss = await readFile(path.join(root, 'en/rss.xml'), 'utf8');
+assert.equal((englishRss.match(/<item>/g) || []).length, search.length, 'English RSS and search disagree');
 assert.equal((rss.match(/<item>/g) || []).length, search.length, 'RSS and search disagree');
 assert.ok(rss.includes(origin), 'RSS has incorrect origin');
 const sitemap = await readFile(path.join(root, 'sitemap-0.xml'), 'utf8');

@@ -1,35 +1,9 @@
 ---
-import { render } from 'astro:content';
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import { getPosts, url, dateLabel, readingMinutes, postUrl, type Post } from '../../lib/posts';
-import Icon from '../../components/Icon.astro';
+import ArticlePage from '../../components/ArticlePage.astro';
+import { getPosts } from '../../lib/posts';
 export async function getStaticPaths() {
-  const posts = await getPosts();
+  const posts = await getPosts('zh');
   return posts.map((post, i) => ({ params: { id: post.id }, props: { post, next: posts[i + 1] } }));
 }
-interface Props { post: Post; next?: Post; }
-const { post, next } = Astro.props;
-const { Content, headings } = await render(post);
-const toc = headings.filter(heading => heading.depth === 2 || heading.depth === 3);
 ---
-<BaseLayout title={post.data.title} description={post.data.description} article>
-  <div class="reading-progress" id="reading-progress" aria-hidden="true"></div>
-  <article class="article-shell container">
-    <header class="article-header"><a class="back-link" href={url('posts/')}>← 所有文章</a><div class="article-tags">{post.data.tags.map(tag => <a href={url(`tags/${encodeURIComponent(tag)}/`)}>{tag}</a>)}</div><h1>{post.data.title}</h1><p class="article-description">{post.data.description}</p><div class="article-meta"><time datetime={post.data.date.toISOString()}>{dateLabel(post.data.date)}</time><span>·</span><span>{readingMinutes(post.body)} 分钟阅读</span></div></header>
-    <div class="article-columns"><div><div class="prose" id="article-body"><Content /></div><div class="article-end"><span>— 写于思考之间 —</span><p>感谢阅读，愿这篇记录带给你一点新的发现。</p></div>{next && <a class="next-post" href={postUrl(next)}><span class="eyebrow">继续阅读</span><h2>{next.data.title}<Icon name="arrow" /></h2><p>{next.data.description}</p></a>}</div>{toc.length > 0 && <aside class="toc" aria-label="文章目录"><span class="eyebrow">ON THIS PAGE</span><h2>文章目录</h2><nav>{toc.map(heading => <a href={`#${heading.slug}`} class:list={{ 'toc-sub': heading.depth === 3 }}>{heading.text}</a>)}</nav><a class="toc-top" href="#main">↑ 回到顶部</a></aside>}</div>
-  </article>
-  <script>
-    const body = document.querySelector<HTMLElement>('#article-body')!;
-    const progress = document.querySelector<HTMLElement>('#reading-progress')!;
-    const updateProgress = () => { const range = body.offsetTop + body.offsetHeight - innerHeight; const ratio = Math.max(0, Math.min(1, scrollY / Math.max(1, range))); progress.style.transform = `scaleX(${ratio})`; };
-    window.addEventListener('scroll', updateProgress, { passive: true }); updateProgress();
-    const links = [...document.querySelectorAll<HTMLAnchorElement>('.toc nav a')];
-    const observer = new IntersectionObserver(entries => { entries.forEach(entry => { if (entry.isIntersecting) { links.forEach(link => link.classList.toggle('active', decodeURIComponent(link.hash.slice(1)) === entry.target.id)); } }); }, { rootMargin: '-80px 0px -65% 0px' });
-    body.querySelectorAll('h2, h3').forEach(heading => observer.observe(heading));
-    body.querySelectorAll('pre').forEach(pre => {
-      const button = document.createElement('button'); button.className = 'copy-button'; button.textContent = '复制'; button.setAttribute('aria-label', '复制代码');
-      button.addEventListener('click', async () => { try { await navigator.clipboard.writeText(pre.querySelector('code')?.textContent || ''); button.textContent = '已复制'; } catch { button.textContent = '请手动复制'; } window.setTimeout(() => { button.textContent = '复制'; }, 2000); });
-      pre.append(button);
-    });
-  </script>
-</BaseLayout>
+<ArticlePage {...Astro.props} />

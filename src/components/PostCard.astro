@@ -3,15 +3,18 @@ import type { Post } from '../lib/posts';
 import { dateLabel, postUrl, readingMinutes } from '../lib/posts';
 import Artwork from './Artwork.astro';
 import Icon from './Icon.astro';
+import { text } from '../lib/i18n';
 interface Props { post: Post; }
 const { post } = Astro.props;
+const locale = post.collection === 'posts-en' ? 'en' : 'zh';
+const ui = text(locale);
 ---
 <a class="post-card" href={postUrl(post)}>
   <Artwork kind={post.data.cover} />
   <div class="card-content">
-    <div class="eyebrow">{post.data.tags[0] || '随笔'} <span class="tiny-dot"></span> {readingMinutes(post.body)} 分钟阅读</div>
+    <div class="eyebrow">{post.data.tagLabels[post.data.tags[0]] || post.data.tags[0] || ui.notes} <span class="tiny-dot"></span> {readingMinutes(post.body)} {ui.minutes}</div>
     <h3>{post.data.title}</h3>
     <p>{post.data.description}</p>
-    <div class="card-bottom"><time datetime={post.data.date.toISOString()}>{dateLabel(post.data.date)}</time><Icon name="arrow" /></div>
+    <div class="card-bottom"><time datetime={post.data.date.toISOString()}>{dateLabel(post.data.date, locale)}</time><Icon name="arrow" /></div>
   </div>
 </a>

@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { text } from '../lib/i18n';
+import { localeUrl, getTagLabels, type Post } from '../lib/posts';
+interface Props { tag: string; posts: Post[]; }
+const { tag, posts } = Astro.props;
+const locale = posts[0]?.collection === 'posts-en' ? 'en' : 'zh';
+const ui = text(locale);
+const url = (path = '') => localeUrl(path, locale);
+const tagLabel = getTagLabels(posts)[tag] || tag;
+---
+<BaseLayout title={`${ui.tags}: ${tagLabel}`} locale={locale}><section class="page-intro container"><a class="back-link" href={url('tags/')}>← {ui.allTags}</a><h1># {tagLabel}</h1><p>{ui.related.replace('{tag}', tagLabel)} {ui.articleCount.replace('{count}', String(posts.length))}</p></section><section class="post-grid tag-posts container">{posts.map(post => <PostCard post={post} />)}</section></BaseLayout>

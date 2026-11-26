@@ -1,0 +1,28 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Artwork from '../components/Artwork.astro';
+import PostCard from '../components/PostCard.astro';
+import Icon from '../components/Icon.astro';
+import { getPosts, localeUrl, postUrl, dateLabel, readingMinutes, getTagLabels, type Locale } from '../lib/posts';
+import { site } from '../site';
+import { text } from '../lib/i18n';
+interface Props { locale?: Locale; }
+const { locale = 'zh' } = Astro.props;
+const ui = text(locale);
+const url = (path = '') => localeUrl(path, locale);
+const displaySite = locale === 'en' ? site.en : site;
+const posts = await getPosts(locale);
+const tagLabels = getTagLabels(posts);
+const featured = posts.find(post => post.data.featured) || posts[0];
+const tags = [...new Set(posts.flatMap(post => post.data.tags))];
+---
+<BaseLayout locale={locale}>
+  <section class="hero container">
+    <div class="hero-copy"><div class="eyebrow"><span class="status-dot"></span> A PERSONAL SPACE FOR IDEAS</div><h1 class="hero-motto">{locale === 'en' ? site.en.tagline : <Fragment>人生<span class="accent-word">海海<svg viewBox="0 0 160 14" fill="none" aria-hidden="true"><path d="M3 9c42-9 91-8 154-4M9 13c41-6 96-5 141-4" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg></span></Fragment>}</h1><p>{displaySite.description}<br />{ui.heroExtra}</p><a class="primary-button" href={url('posts/')}>{ui.read} <Icon name="arrow" size={18} /></a><span class="hero-caption">{ui.grow}</span></div>
+    <div class="hero-visual"><div class="visual-topline"><span>AXIS IDEAS — 001</span><span>{ui.visualWords}</span></div><Artwork /><div class="visual-bottomline"><span>{ui.visualCaption}</span><span class="coordinate">∞ POSSIBILITIES</span></div><div class="visual-seal">{ui.sealFirst}<br />{ui.sealSecond}</div></div>
+  </section>
+  <div class="intro-strip container"><span>{ui.intro}</span><span>{ui.introTopics}</span><span class="strip-star">✳</span></div>
+  {featured && <section class="featured-section container"><div class="section-heading"><div><span class="eyebrow">THE EDITOR'S PICK</span><h2>{ui.pickTitle}</h2></div><span class="section-note">{ui.pickNote}</span></div><a class="featured-card" href={postUrl(featured)}><div class="featured-art"><Artwork kind={featured.data.cover} /><span class="featured-label">{ui.featured}</span></div><div class="featured-copy"><div class="eyebrow">{featured.data.tags.map(tag => tagLabels[tag] || tag).join(' / ')}</div><h3>{featured.data.title}</h3><p>{featured.data.description}</p><div class="article-meta"><time datetime={featured.data.date.toISOString()}>{dateLabel(featured.data.date, locale)}</time><span>·</span><span>{readingMinutes(featured.body)} {ui.minutes}</span></div><span class="text-link">{ui.readArticle} <Icon name="arrow" size={18} /></span></div></a></section>}
+  {posts.length > 1 && <section class="latest-section container"><div class="section-heading"><div><span class="eyebrow">RECENT STORIES</span><h2>{ui.recent}</h2></div><a class="text-link" href={url('posts/')}>{ui.allPosts} <Icon name="arrow" size={18} /></a></div><div class="post-grid">{posts.slice(0, 3).map(post => <PostCard post={post} />)}</div></section>}
+  <section class="bottom-note container"><div><span class="eyebrow">FOLLOW YOUR CURIOSITY</span><h2>{ui.curiosity}</h2><p>{ui.curiosityNote}</p><div class="tag-cloud">{tags.map(tag => <a href={url(`tags/${encodeURIComponent(tag)}/`)}># {tagLabels[tag] || tag}</a>)}</div></div><span class="note-flower" aria-hidden="true">✳</span></section>
+</BaseLayout>

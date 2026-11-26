@@ -5,4 +5,9 @@ export const site = {
   author: 'Axis',
   tagline: '人生海海',
   github: 'https://github.com/DeepLearningRepo/myblog',
+  en: {
+    name: "Axis's Ideas",
+    tagline: 'Life, in all its tides.',
+    description: 'A place for scattered ideas, technical explorations, and thoughts worth keeping.',
+  },
 };

@@ -2,17 +2,26 @@
 import '../styles/global.css';
 import 'katex/dist/katex.min.css';
 import { site } from '../site';
-import { url } from '../lib/posts';
+import { url, localeUrl, type Locale } from '../lib/posts';
+import { text } from '../lib/i18n';
 import Icon from '../components/Icon.astro';
-interface Props { title?: string; description?: string; article?: boolean; }
-const { title, description = site.description, article = false } = Astro.props;
-const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.tagline}`;
+interface Props { title?: string; description?: string; article?: boolean; locale?: Locale; }
+const relativePath = Astro.url.pathname.slice(import.meta.env.BASE_URL.replace(/\/$/, '').length).replace(/^\//, '');
+const locale = Astro.props.locale || (relativePath.startsWith('en/') ? 'en' : 'zh');
+const ui = text(locale);
+const displaySite = locale === 'en' ? site.en : site;
+const { title, description = displaySite.description, article = false } = Astro.props;
+const fullTitle = title ? `${title} · ${displaySite.name}` : `${displaySite.name} · ${displaySite.tagline}`;
+const localUrl = (path = '') => localeUrl(path, locale);
+const chinesePath = locale === 'en' ? relativePath.slice(3) : relativePath;
+const isNotFound = /^404(?:\.html)?\/?$/.test(chinesePath);
+const languageUrls = { zh: isNotFound ? url() : url(chinesePath), en: url(isNotFound ? 'en/' : `en/${chinesePath}`) };
 const canonical = new URL(Astro.url.pathname, Astro.site || Astro.url);
 const currentPath = Astro.url.pathname;
-const nav = [ { label: '首页', href: url() }, { label: '文章', href: url('posts/') }, { label: '标签', href: url('tags/') }, { label: '关于', href: url('about/') } ];
+const nav = [ { label: ui.home, href: localUrl() }, { label: ui.posts, href: localUrl('posts/') }, { label: ui.tags, href: localUrl('tags/') }, { label: ui.about, href: localUrl('about/') } ];
 ---
 <!doctype html>
-<html lang="zh-CN">
+<html lang={locale === 'en' ? 'en' : 'zh-CN'}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -25,36 +34,39 @@ const nav = [ { label: '首页', href: url() }, { label: '文章', href: url('po
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={new URL(url('social.svg'), Astro.site || Astro.url)} />
     <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="zh-CN" href={new URL(languageUrls.zh, Astro.site || Astro.url)} />
+    <link rel="alternate" hreflang="en" href={new URL(languageUrls.en, Astro.site || Astro.url)} />
     <link rel="icon" href={url('favicon.svg')} type="image/svg+xml" />
-    <link rel="alternate" type="application/rss+xml" title={`${site.name} RSS`} href={url('rss.xml')} />
+    <link rel="alternate" type="application/rss+xml" title={`${displaySite.name} RSS`} href={localUrl('rss.xml')} />
     <title>{fullTitle}</title>
     <script is:inline>
       (() => { let theme; try { theme = localStorage.getItem('theme'); } catch {} document.documentElement.dataset.theme = theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); })();
     </script>
   </head>
   <body>
-    <a href="#main" class="skip-link">跳到正文</a>
+    <a href="#main" class="skip-link">{ui.skip}</a>
     <header class="site-header">
       <div class="header-inner">
-        <a class="brand" href={url()} aria-label={`${site.name}首页`}><span class="brand-mark">A</span><span>{site.name}<small>{site.englishName}</small></span></a>
-        <nav aria-label="主导航">{nav.map(item => <a href={item.href} aria-current={currentPath === item.href ? 'page' : undefined}>{item.label}</a>)}</nav>
+        <a class="brand" href={localUrl()} aria-label={`${displaySite.name} ${ui.home}`}><span class="brand-mark">A</span><span>{displaySite.name}<small>{site.englishName}</small></span></a>
+        <nav aria-label={ui.nav}>{nav.map(item => <a href={item.href} aria-current={currentPath === item.href ? 'page' : undefined}>{item.label}</a>)}</nav>
         <div class="header-actions">
-          <button id="search-open" class="icon-button" aria-label="搜索文章" title="搜索文章（Ctrl / ⌘ K）"><Icon name="search" /></button>
-          <button id="theme-toggle" class="icon-button" aria-label="切换深色或浅色主题"><span class="light-icon"><Icon name="moon" /></span><span class="dark-icon"><Icon name="sun" /></span></button>
+          <div class="language-switch" aria-label={locale === 'en' ? 'Language' : '语言'}><a href={languageUrls.zh} lang="zh-CN" aria-current={locale === 'zh' ? 'true' : undefined}>中</a><a href={languageUrls.en} lang="en" aria-current={locale === 'en' ? 'true' : undefined}>EN</a></div>
+          <button id="search-open" class="icon-button" aria-label={ui.search} title={`${ui.search} (Ctrl / ⌘ K)`}><Icon name="search" /></button>
+          <button id="theme-toggle" class="icon-button" aria-label={ui.theme}><span class="light-icon"><Icon name="moon" /></span><span class="dark-icon"><Icon name="sun" /></span></button>
         </div>
       </div>
     </header>
     <main id="main" tabindex="-1"><slot /></main>
     <footer class="site-footer container">
-      <div><a class="footer-brand" href={url()}>{site.name}<span> / {site.englishName}</span></a><p>把思考写下来，让时间留下痕迹。</p></div>
-      <div class="footer-right"><div class="footer-links"><a href={url('rss.xml')}><Icon name="rss" size={16} /> RSS 订阅</a>{site.github && <a href={site.github} target="_blank" rel="noopener noreferrer"><Icon name="github" size={16} /> GitHub</a>}</div><small>© {new Date().getFullYear()} {site.author} · 用文字连接世界</small></div>
+      <div><a class="footer-brand" href={localUrl()}>{displaySite.name}<span> / {site.englishName}</span></a><p>{ui.footer}</p></div>
+      <div class="footer-right"><div class="footer-links"><a href={localUrl('rss.xml')}><Icon name="rss" size={16} /> {ui.rss}</a>{site.github && <a href={site.github} target="_blank" rel="noopener noreferrer"><Icon name="github" size={16} /> GitHub</a>}</div><small>© {new Date().getFullYear()} {site.author} · {ui.copyright}</small></div>
     </footer>
-    <dialog id="search-dialog" aria-labelledby="search-title" data-index={url('search-index.json')}>
-      <div class="search-heading"><h2 id="search-title">寻找一篇文章</h2><button class="icon-button" id="search-close" aria-label="关闭搜索"><Icon name="close" /></button></div>
-      <label class="search-field"><Icon name="search" /><input id="search-input" type="search" placeholder="搜索标题、标签或正文…" autocomplete="off" /></label>
-      <p id="search-status" class="search-status" role="status">输入关键词开始搜索</p>
+    <dialog id="search-dialog" aria-labelledby="search-title" data-index={localUrl('search-index.json')} data-messages={JSON.stringify(ui)}>
+      <div class="search-heading"><h2 id="search-title">{ui.searchTitle}</h2><button class="icon-button" id="search-close" aria-label={ui.close}><Icon name="close" /></button></div>
+      <label class="search-field"><Icon name="search" /><input id="search-input" type="search" placeholder={ui.placeholder} autocomplete="off" /></label>
+      <p id="search-status" class="search-status" role="status">{ui.searchStart}</p>
       <div id="search-results"></div>
-      <div class="search-hint"><kbd>Esc</kbd> 关闭 <span><kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>K</kbd> 搜索</span></div>
+      <div class="search-hint"><kbd>Esc</kbd> {ui.close} <span><kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>K</kbd> {ui.search}</span></div>
     </dialog>
     <script>
       const themeToggle = document.querySelector<HTMLButtonElement>('#theme-toggle')!;
@@ -65,6 +77,7 @@ const nav = [ { label: '首页', href: url() }, { label: '文章', href: url('po
         try { localStorage.setItem('theme', theme); } catch {}
       });
       const dialog = document.querySelector<HTMLDialogElement>('#search-dialog')!;
+      const messages = JSON.parse(dialog.dataset.messages!) as Record<string, string>;
       const input = document.querySelector<HTMLInputElement>('#search-input')!;
       const results = document.querySelector<HTMLDivElement>('#search-results')!;
       const status = document.querySelector<HTMLParagraphElement>('#search-status')!;
@@ -86,13 +99,13 @@ const nav = [ { label: '首页', href: url() }, { label: '文章', href: url('po
         const current = ++revision;
         const query = input.value.trim().toLocaleLowerCase();
         results.replaceChildren();
-        if (!query) { status.textContent = '输入关键词开始搜索'; return; }
-        status.textContent = '正在搜索…';
-        try { index ||= await getIndex(); } catch { if (current === revision) status.textContent = '搜索暂时不可用，请稍后再试。'; return; }
+        if (!query) { status.textContent = messages.searchStart; return; }
+        status.textContent = messages.searching;
+        try { index ||= await getIndex(); } catch { if (current === revision) status.textContent = messages.searchError; return; }
         if (current !== revision) return;
         const terms = query.split(/\s+/);
         const matches = index.filter(entry => terms.every(term => `${entry.title} ${entry.description} ${entry.tags.join(' ')} ${entry.body}`.toLocaleLowerCase().includes(term)));
-        status.textContent = matches.length ? `找到 ${matches.length} 篇文章` : '没有找到相关文章，换个关键词试试。';
+        status.textContent = matches.length ? messages.searchFound.replace('{count}', String(matches.length)) : messages.searchEmpty;
         matches.slice(0, 20).forEach(entry => {
           const link = document.createElement('a'); link.href = entry.url; link.className = 'search-result';
           const heading = document.createElement('strong'); heading.textContent = entry.title;

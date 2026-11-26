@@ -1,0 +1,35 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { localeUrl, dateLabel, readingMinutes, postUrl, type Post } from '../lib/posts';
+import Icon from '../components/Icon.astro';
+import { text } from '../lib/i18n';
+interface Props { post: Post; next?: Post; }
+const { post, next } = Astro.props;
+const locale = post.collection === 'posts-en' ? 'en' : 'zh';
+const ui = text(locale);
+const url = (path = '') => localeUrl(path, locale);
+const { Content, headings } = await render(post);
+const toc = headings.filter(heading => heading.depth === 2 || heading.depth === 3);
+---
+<BaseLayout title={post.data.title} description={post.data.description} article locale={locale}>
+  <div class="reading-progress" id="reading-progress" aria-hidden="true"></div>
+  <article class="article-shell container">
+    <header class="article-header"><a class="back-link" href={url('posts/')}>← {ui.allPosts}</a><div class="article-tags">{post.data.tags.map(tag => <a href={url(`tags/${encodeURIComponent(tag)}/`)}>{post.data.tagLabels[tag] || tag}</a>)}</div><h1>{post.data.title}</h1><p class="article-description">{post.data.description}</p><div class="article-meta"><time datetime={post.data.date.toISOString()}>{dateLabel(post.data.date, locale)}</time><span>·</span><span>{readingMinutes(post.body)} {ui.minutes}</span></div>{locale === 'en' && <div class="translation-note"><span>{ui.machine}</span><a href={localeUrl(`posts/${post.id}/`, 'zh')}>中文原文</a></div>}</header>
+    <div class="article-columns"><div><div class="prose" id="article-body" data-copy={ui.copy} data-copied={ui.copied} data-copy-error={ui.copyError}><Content /></div><div class="article-end"><span>{ui.end}</span><p>{ui.thanks}</p></div>{next && <a class="next-post" href={postUrl(next)}><span class="eyebrow">{ui.continue}</span><h2>{next.data.title}<Icon name="arrow" /></h2><p>{next.data.description}</p></a>}</div>{toc.length > 0 && <aside class="toc" aria-label={ui.toc}><span class="eyebrow">ON THIS PAGE</span><h2>{ui.toc}</h2><nav>{toc.map(heading => <a href={`#${heading.slug}`} class:list={{ 'toc-sub': heading.depth === 3 }}>{heading.text}</a>)}</nav><a class="toc-top" href="#main">↑ {ui.top}</a></aside>}</div>
+  </article>
+  <script>
+    const body = document.querySelector<HTMLElement>('#article-body')!;
+    const progress = document.querySelector<HTMLElement>('#reading-progress')!;
+    const updateProgress = () => { const range = body.offsetTop + body.offsetHeight - innerHeight; const ratio = Math.max(0, Math.min(1, scrollY / Math.max(1, range))); progress.style.transform = `scaleX(${ratio})`; };
+    window.addEventListener('scroll', updateProgress, { passive: true }); updateProgress();
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('.toc nav a')];
+    const observer = new IntersectionObserver(entries => { entries.forEach(entry => { if (entry.isIntersecting) { links.forEach(link => link.classList.toggle('active', decodeURIComponent(link.hash.slice(1)) === entry.target.id)); } }); }, { rootMargin: '-80px 0px -65% 0px' });
+    body.querySelectorAll('h2, h3').forEach(heading => observer.observe(heading));
+    body.querySelectorAll('pre').forEach(pre => {
+      const button = document.createElement('button'); button.className = 'copy-button'; button.textContent = body.dataset.copy!; button.setAttribute('aria-label', body.dataset.copy!);
+      button.addEventListener('click', async () => { try { await navigator.clipboard.writeText(pre.querySelector('code')?.textContent || ''); button.textContent = body.dataset.copied!; } catch { button.textContent = body.dataset.copyError!; } window.setTimeout(() => { button.textContent = body.dataset.copy!; }, 2000); });
+      pre.append(button);
+    });
+  </script>
+</BaseLayout>

@@ -6,3 +6,9 @@ dist/
 !.env.example
 .DS_Store
 artifacts/
+.translation-models/
+.translation-venv/
+translate-zh_en-1_9.argosmodel
+**/#*#
+**/.#*
+*~

@@ -2,6 +2,24 @@
 
 暖白与深蓝的阅读主题，配有深色模式、文章目录、阅读进度、代码复制、标签、全文搜索、数学公式、RSS 与站点地图。所有页面静态生成，发布到 GitHub Pages 后不需要服务器常驻。
 
+## 中英文与自动翻译
+
+你只需要在 `src/content/posts/` 编写中文 Markdown。每次 `npm run build`（包括 GitHub 自动发布）都会检查原文，自动为新增或修改的文章生成 `src/content/posts-en/` 下的英文 Markdown；未改动的文章直接复用译稿。
+
+页头的 **中 / EN** 在同一页面的两个版本之间切换。英文版本包含首页、文章、目录、标签、搜索和独立 RSS。
+
+翻译使用本地 Argos / OpenNMT 中英模型，不需要 API Key。首次需要 Python 3.10 或更新版本，并自动准备隔离环境及约 71 MB 的模型。模型随后缓存，文章文本在运行翻译的主机上处理。GitHub Actions 会自动安装 Python 并缓存模型。
+
+代码、公式、HTML 锚点和链接地址保留，图片共享。译稿开头的 `sourceHash` 用于判断中文原文是否改变；你可以手动润色英文正文，保留该字段，之后未改动的原文不会覆盖你的润色。原文再次变化时会重新生成英文版本。
+
+单独生成英文译稿：
+
+```bash
+npm run translate
+```
+
+如果远端首次安装翻译依赖时访问 PyPI 较慢，可以运行 `PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple npm run translate`。安装完成后正常使用 `npm run build` 即可。
+
 ## 直接预览已部署的远端版本
 
 远端常驻预览运行在 `127.0.0.1:4321`。在本地终端建立转发：

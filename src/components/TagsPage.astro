@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getPosts, localeUrl, getTagLabels, type Locale } from '../lib/posts';
+import Icon from '../components/Icon.astro';
+import { text } from '../lib/i18n';
+interface Props { locale?: Locale; }
+const { locale = 'zh' } = Astro.props;
+const ui = text(locale);
+const url = (path = '') => localeUrl(path, locale);
+const posts = await getPosts(locale);
+const tagLabels = getTagLabels(posts);
+const tags = [...new Set(posts.flatMap(post => post.data.tags))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+---
+<BaseLayout title={ui.tags} locale={locale}><section class="page-intro container"><span class="eyebrow">EXPLORE BY TOPIC</span><h1>{ui.topicsTitle}</h1><p>{ui.topicsNote}</p></section><section class="topic-grid container">{tags.map((tag, i) => <a href={url(`tags/${encodeURIComponent(tag)}/`)} class="topic-card"><span class="topic-number">{String(i + 1).padStart(2, '0')} / TOPIC</span><h2>{tagLabels[tag] || tag}</h2><div><span>{ui.articleCount.replace('{count}', String(posts.filter(post => post.data.tags.includes(tag)).length))}</span><Icon name="arrow" /></div></a>)}</section></BaseLayout>

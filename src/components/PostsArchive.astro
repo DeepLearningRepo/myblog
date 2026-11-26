@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getPosts, postUrl, localeUrl, dateLabel, readingMinutes, type Locale } from '../lib/posts';
+import Icon from '../components/Icon.astro';
+import { text } from '../lib/i18n';
+interface Props { locale?: Locale; }
+const { locale = 'zh' } = Astro.props;
+const ui = text(locale);
+const url = (path = '') => localeUrl(path, locale);
+const posts = await getPosts(locale);
+const years = [...new Set(posts.map(post => post.data.date.getUTCFullYear()))];
+---
+<BaseLayout title={ui.allPosts} locale={locale}><section class="page-intro container"><span class="eyebrow">THE ARCHIVE</span><h1>{ui.archiveTitle}</h1><p>{ui.archiveNote} {ui.articleCount.replace('{count}', String(posts.length))}</p></section><section class="archive container">{years.map(year => <div class="archive-year"><h2>{year}<span> / NOTES</span></h2><div>{posts.filter(post => post.data.date.getUTCFullYear() === year).map(post => <article class="archive-row"><a class="archive-main" href={postUrl(post)}><div class="article-meta"><time datetime={post.data.date.toISOString()}>{dateLabel(post.data.date, locale)}</time><span>· {readingMinutes(post.body)} {ui.minutes}</span></div><h3>{post.data.title}</h3><p>{post.data.description}</p></a><div class="archive-tags">{post.data.tags.map(tag => <a href={url(`tags/${encodeURIComponent(tag)}/`)}># {post.data.tagLabels[tag] || tag}</a>)}</div><a class="row-arrow" href={postUrl(post)} aria-label={`${ui.readArticle}: ${post.data.title}`}><Icon name="arrow" /></a></article>)}</div></div>)}</section></BaseLayout>
