@@ -14,10 +14,9 @@ tagLabels:
   GPU: GPU
   布局代数: Layout Algebra
   CuTe: CuTe
-sourceHash: 5c93584283203932d5df64a1c64e5e82cb058275811f6920e471b5b6c1309022
+sourceHash: 6e97979bde3d0beef51b04f9a69aa99bc2ccd1ba504f337045b035dd7df06f19
 translation: reviewed
 ---
-
 
 ## 1. Overview
 
@@ -145,15 +144,19 @@ $$
 \operatorname{offset}(x_0, x_1)
 = x_0 t_0 + x_1 t_1
 = x_0 + 4x_1.
+\tag{7}
 $$
 
 For example, the element $tensor[1, 1]$ has storage offset $1 + 4 \times 1 = 5$. If the tensor's base address is $base$ and each element occupies $b$ bytes, the element's address is $base + 5b$.
 
 For a $d$-dimensional tensor, the rule stays the same: multiply each coordinate by the corresponding stride, then sum the contributions:
 
+<span id="eq8"></span>
+
 $$
 \operatorname{offset}(x_0, x_1, \dots, x_{d-1})
 = \sum_{i=0}^{d-1} x_i t_i.
+\tag{8}
 $$
 
 From this perspective, $shape$ defines the range of coordinates in each dimension, and $stride$ defines how far storage advances when moving along that dimension. Together, they describe the mapping from logical coordinates to storage offsets.
@@ -164,4 +167,79 @@ With this mapping in mind, it becomes easier to understand why GPU code often co
 
 ![Manual index calculations in GPU code](../../assets/layout-algebra-1/gpu-indexing-code.png)
 
-In principle, this code works. However, it offers limited support for layout transformations and is harder to maintain. Next, we will look at Triton and CuTe, two successful implementations, to see how layout algebra is used in practice.
+In principle, this code works. However, it offers limited support for layout transformations and is harder to maintain. Next, we will look at $\bold{Triton}$ and $\bold{Cute}$, two successful implementations, to see how layout algebra is used in practice.
+
+## 4. LinearLayout
+
+### 4.1 Overview
+
+$\bold{Triton}$ is an operator DSL compiler released by OpenAI. Its programming unit is a block rather than an individual thread. Developers only need to focus on data partitioning and operations inside a tile—the tensor region handled from a block-level perspective—without managing each thread's internal state. This abstraction does not make the underlying layout problem disappear. The $\bold{Triton}$ compiler handles it through $\bold{LinearLayout}$.
+
+<span id="42-工程实现" data-source-heading></span>
+
+### 4.2 Engineering implementation
+
+<span id="421-数据结构" data-source-heading></span>
+
+#### 4.2.1 Data structures
+
+We use the formal tensor representation in equation [(4)](#eq4). It contains the following information:
+
+- Dimension names ($\bold{label}$): $\bold{(s_0, s_1, \dots, s_{d-1})}$
+- Dimension lengths ($\bold{length}$): $\bold{|s_0|, |s_1|, \dots}$
+- Dimension offsets ($\bold{offset}$): $\bold{(t_0, t_1, \dots, t_{d-1})}$
+
+For a dense tensor, equation [(8)](#eq8) holds. If every dimension's length also satisfies the following power-of-two condition:
+
+$$
+\forall\, i\in\{0,\dots,d-1\},\ \exists\, n_i\in\mathbb{N}:\ s_i = 2^{n_i}
+\tag{9}
+$$
+
+we can represent this information in the following diagram:
+
+![Bit mappings between the input and output dimensions of a LinearLayout](../../assets/layout-algebra-1/linear-layout-bases.png)
+
+At the top of the diagram, the labels $\bold{input\_dim0}$ and $\bold{input\_dim1}$ represent two dimensions of an input tensor. The black-and-white boxes below each label represent individual bits. The number of bits encodes the dimension's length: for example, $\bold{input\_dim0}$ has five bits, so its length is $\bold{2^5}$. The output dimensions have the same interpretation.
+
+> **Note**
+>
+> $\bold{LinearLayout}$ allows developers to specify both input and output tensor layouts.
+>
+> This means that $\bold{LinearLayout}$ also supports $\bold{view}$ functionality.
+
+Some entries in the table have a bit value of one, while most are zero. A one indicates that the corresponding input bit contributes to a bit in the output dimension.
+
+With this interpretation in mind, we can look at the LinearLayout data structure:
+
+```cpp
+class LinearLayout {
+private:
+  // bases[inDim][i] = L(0, ..., inDim=2^i, ..., 0).  All other values of L are
+  // computed by xor'ing bases together, using the linearity rule.  In addition:
+  //
+  // - Each inDim has the same set of outDims, in the same order.
+  // - The order of dims is minor-to-major, although this only affects reshape.
+  llvm::MapVector<StringAttr /*inDim*/,
+                  std::vector<std::vector<int32_t> /*size=getNumOutDims()*/>
+                  /*size=getInDimSizeLog2(inDim)*/>
+      bases;
+
+  llvm::MapVector<StringAttr, int32_t /*size*/> outDims;
+  int32_t rank = 0;
+  ...
+};    
+```
+
+The $\bold{bases}$ field corresponds to the table shown above:
+
+- $\bold{StringAttr}$: the input dimension's label name, corresponding to $\bold{input\_dim0}$ and $\bold{input\_dim1}$.
+- $\bold{std::vector<std::vector<int32\_t>>}$: the outer vector's length is the number of bits associated with the input label. Raising two to this size gives the input dimension's length. Each inner vector records how the current bit contributes to multiple output dimensions; its length is the number of output dimensions.
+- $\bold{outDims}$: information about the output dimensions, corresponding to the labels along the left-hand axis of the table.
+- $\bold{rank}$: the current rank.
+
+<span id="422-布局构造" data-source-heading></span>
+
+#### 4.2.2 Layout construction
+
+##### 4.2.2.1

@@ -8,6 +8,8 @@ cover: windows
 draft: false
 ---
 
+[toc]
+
 ## 1. Overview
 
 在现代GPU编程中DataTiling是一件非常重要的事情。简单来说，如果我们要充分发挥GPU并发的优势，我们就需要把Tensor数据按照一定的规则划分到每个线程上，最终让每个thread都持有一组数据。这样当我协同多wrap或者多wrap group， 甚至多sm的时候，我们就可以一次性计算出多个结果。
@@ -121,15 +123,19 @@ $$
 \operatorname{offset}(x_0, x_1)
 = x_0 t_0 + x_1 t_1
 = x_0 + 4x_1.
+\tag{7}
 $$
 
 例如，元素 $tensor[1, 1]$ 的存储偏移为 $1 + 4 \times 1 = 5$。如果张量的起始地址为 $base$，且每个元素占用 $b$ 字节，那么该元素的地址就是 $base + 5b$。
 
 推广到 $d$ 维张量，计算方法保持不变：将每一维的坐标乘以该维的 stride，再将各维贡献的偏移相加，即：
 
+<span id="eq8"></span>
+
 $$
 \operatorname{offset}(x_0, x_1, \dots, x_{d-1})
 = \sum_{i=0}^{d-1} x_i t_i.
+\tag{8}
 $$
 
 从这个角度看，$shape$ 确定各维坐标的取值范围，$stride$ 确定沿各维移动时的存储步长，两者共同描述了从逻辑坐标到存储偏移的映射。
@@ -142,4 +148,80 @@ $$
 
 ![GPU 代码中的手动索引计算示例](../../assets/layout-algebra-1/gpu-indexing-code.png)
 
-从理论上讲这样的代码没啥问题。  但是缺少了一些变换方式与可维护性。下面我们会从Triton和Cute两个成功的工程实现看看业界是如何将布局代数落地的。
+从理论上讲这样的代码没啥问题。  但是缺少了一些变换方式与可维护性。下面我们会从$\bold{Triton}$和$\bold{Cute}$两个成功的工程实现看看业界是如何将布局代数落地的。
+
+
+
+## 4. LinearLayout
+
+### 4.1 overview
+
+$\bold{Triton}$是OpenAI发布的算子DSL编译器。其目的是以Block而非thread为编程原子核心，普通开发者只需要关注一个Tile内部（也就是Block视角下要处理的张量规模）的数据划分和操作就可以了，而不需要关注一个thread内部情况。但是开发者不关心并不代表问题就会消失。承担这一切的是$\bold{Triton}$编译器中的$\bold{LinearLayout}$。
+
+
+
+### 4.2 工程实现
+
+#### 4.2.1 数据结构
+
+我们使用公式 [(4)](#eq4) 中的形式化方式来表示一个张量。其内部有如下几个信息：
+
+- 维度名($\bold{label}$)： $\bold{(s_0, s_1, \dots, s_{d-1})}$
+
+* 维度长度($\bold{length}$)：$\bold{|s_0|, |s_1|, \dots}$
+
+* 维度偏移($\bold{offset}$)： $\bold{(t_0, t_1, \dots, t_{d-1})}$
+
+同时对于稠密型张量，其满足公式 [(8)](#eq8) 。同时如果每个维度长度都满足如下条件：
+$$
+\forall\, i\in\{0,\dots,d-1\},\ \exists\, n_i\in\mathbb{N}:\ s_i = 2^{n_i}
+\tag{9}
+$$
+那我们就可以将这些信息简化到如下的图中：
+
+![LinearLayout 输入输出维度的位映射示意图](../../assets/layout-algebra-1/linear-layout-bases.png)
+
+首先这张图的横坐标在最上面有名为$\bold{input\_dim0}$和$\bold{input\_dim1}$的两个label，来表示一个输入张量的两个维度。在每个label下面有黑白相间的框代表一个bit位，有多少个bit位就代表当前维度的尝试是多少。比如以$\bold{input\_dim0}$为例，其下面有5个bit，因此其长度为$\bold{2^5}$。同理输出维度也具有相同的语义。
+
+> **注意**
+>
+> 这里需要特别的强调的是$\bold{LinearLayout}$同时支持开发者设置输入张量布局和输出张量布局。
+>
+> 这也就意味着实际上这个$\bold{LinearLayout}$实际上是支持$\bold{view}$功能。
+
+最后，我们需要注意的是在这个表格中有部分的bit值是1（绝大多数都是0）。这个代表当前输入维度对对应输出维度的位有贡献。
+
+有了这个基础我们看看LinearLayout的数据机构是如何定义的。
+
+``` cpp
+class LinearLayout {
+private:
+  // bases[inDim][i] = L(0, ..., inDim=2^i, ..., 0).  All other values of L are
+  // computed by xor'ing bases together, using the linearity rule.  In addition:
+  //
+  // - Each inDim has the same set of outDims, in the same order.
+  // - The order of dims is minor-to-major, although this only affects reshape.
+  llvm::MapVector<StringAttr /*inDim*/,
+                  std::vector<std::vector<int32_t> /*size=getNumOutDims()*/>
+                  /*size=getInDimSizeLog2(inDim)*/>
+      bases;
+
+  llvm::MapVector<StringAttr, int32_t /*size*/> outDims;
+  int32_t rank = 0;
+  ...
+};    
+```
+
+这里的$\bold{bases}$就是我们上面画的表格：
+
+- $\bold{StringAttr}$： 输入维度的label名字，等价于$\bold{input\_dim0}$和$\bold{input\_dim1}$；
+- $\bold{std::vector<std::vector<int32\_t>>}$：外部长度代表当前label下由几个bit组成，因此这里的size的二次幂其实是当前输入维度的长度；内部维度代表了当前bit对多个输出维度有哪些贡献，其长度实际上是输出维度的长度；
+
+- $\bold{outDims}$： 实际上是输出维度的信息，等价于表格的左边轴向label；
+- $\bold{rank}$：代表当前的秩（rank）。
+
+
+
+#### 4.2.2 布局构造
+
+##### 4.2.2.1
