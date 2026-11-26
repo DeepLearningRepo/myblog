@@ -14,9 +14,10 @@ tagLabels:
   GPU: GPU
   布局代数: Layout Algebra
   CuTe: CuTe
-sourceHash: 95edc1a56c1b3d10ace4be3a603a6a1a0f02e99084cb6caab3225e5e57194574
+sourceHash: 5c93584283203932d5df64a1c64e5e82cb058275811f6920e471b5b6c1309022
 translation: reviewed
 ---
+
 
 ## 1. Overview
 
@@ -158,3 +159,9 @@ $$
 From this perspective, $shape$ defines the range of coordinates in each dimension, and $stride$ defines how far storage advances when moving along that dimension. Together, they describe the mapping from logical coordinates to storage offsets.
 
 The distinction is that the one-dimensional index constructed solely from $shape$ in the previous section describes logical traversal order, whereas the actual $offset$ is determined by the $stride$. The two coincide when $t_0 = 1$ and $t_i = \prod_{j=0}^{i-1}s_j$.
+
+With this mapping in mind, it becomes easier to understand why GPU code often contains repetitive, hard-to-follow index calculations such as the following:
+
+![Manual index calculations in GPU code](../../assets/layout-algebra-1/gpu-indexing-code.png)
+
+In principle, this code works. However, it offers limited support for layout transformations and is harder to maintain. Next, we will look at Triton and CuTe, two successful implementations, to see how layout algebra is used in practice.
