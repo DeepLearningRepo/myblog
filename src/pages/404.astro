@@ -1,0 +1,5 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { url } from '../lib/posts';
+---
+<BaseLayout title="页面走丢了"><section class="not-found container"><span class="eyebrow">404 / A SMALL DETOUR</span><h1>这条小路，暂时没有文字。</h1><p>也许地址有误，也许这篇记录还在路上。</p><a class="primary-button" href={url()}>回到首页 →</a></section></BaseLayout>

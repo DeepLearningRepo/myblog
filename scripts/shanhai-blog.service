@@ -1,0 +1,13 @@
+[Unit]
+Description=Axis blog static preview
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/spark01/code/myblog
+ExecStart=/usr/bin/python3 -m http.server 4321 --bind 127.0.0.1 --directory /home/spark01/code/myblog/dist
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

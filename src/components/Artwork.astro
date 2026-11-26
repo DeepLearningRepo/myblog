@@ -1,0 +1,31 @@
+---
+interface Props { kind?: 'mountains' | 'orbit' | 'windows'; }
+const { kind = 'mountains' } = Astro.props;
+---
+<div class:list={['artwork', `artwork-${kind}`]} aria-hidden="true">
+  {kind === 'mountains' && <svg viewBox="0 0 640 430" fill="none">
+    <circle cx="460" cy="106" r="51" fill="#e8a074" />
+    <path d="M-40 350 190 110l178 240 124-170 188 204v85H-40Z" fill="#b8c6bd" />
+    <path d="m-40 405 188-198 164 163 133-133 235 212H-40Z" fill="#65827a" />
+    <path d="m-40 455 252-126 142 89 126-55 200 92H-40Z" fill="#264b4d" />
+    <path d="M190 110 155 188l35-18 32 26Z" fill="#f5eee1" />
+    <path d="M50 130h140M85 150h74M490 240h85" stroke="#f5eee1" stroke-width="2" opacity=".5" />
+    <circle cx="61" cy="72" r="2" fill="#264b4d" /><circle cx="570" cy="55" r="2" fill="#264b4d" />
+  </svg>}
+  {kind === 'orbit' && <svg viewBox="0 0 640 430" fill="none">
+    <circle cx="320" cy="215" r="92" stroke="#7a8b9a" stroke-width="1" />
+    <circle cx="320" cy="215" r="150" stroke="#7a8b9a" stroke-width="1" opacity=".6" />
+    <ellipse cx="320" cy="215" rx="240" ry="82" transform="rotate(-28 320 215)" stroke="#d9cdb8" stroke-width="2" />
+    <circle cx="320" cy="215" r="56" fill="#e5a077" />
+    <circle cx="472" cy="132" r="15" fill="#d9cdb8" /><circle cx="170" cy="244" r="8" fill="#a5bcb5" />
+    <path d="M85 80h35m-17.5-17.5v35M520 340h24m-12-12v24" stroke="#d9cdb8" stroke-width="1" />
+  </svg>}
+  {kind === 'windows' && <svg viewBox="0 0 640 430" fill="none">
+    <rect x="126" y="71" width="320" height="245" rx="10" fill="#f7f2e8" stroke="#25484c" stroke-width="2" />
+    <path d="M126 111h320" stroke="#25484c" stroke-width="2" />
+    <circle cx="148" cy="91" r="4" fill="#c87650" /><circle cx="164" cy="91" r="4" fill="#d7bb7d" /><circle cx="180" cy="91" r="4" fill="#779a82" />
+    <path d="m159 150 12 10-12 10m24 0h24M157 210h190M157 229h124M157 248h166" stroke="#6e8881" stroke-width="5" stroke-linecap="round" />
+    <rect x="345" y="216" width="170" height="140" rx="8" fill="#d29b71" />
+    <path d="M373 254h111M373 272h80M373 290h101M373 308h63" stroke="#f7f2e8" stroke-width="4" stroke-linecap="round" />
+  </svg>}
+</div>

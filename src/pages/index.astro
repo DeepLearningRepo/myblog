@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Artwork from '../components/Artwork.astro';
+import PostCard from '../components/PostCard.astro';
+import Icon from '../components/Icon.astro';
+import { getPosts, url, postUrl, dateLabel, readingMinutes } from '../lib/posts';
+import { site } from '../site';
+const posts = await getPosts();
+const featured = posts.find(post => post.data.featured) || posts[0];
+const tags = [...new Set(posts.flatMap(post => post.data.tags))];
+---
+<BaseLayout>
+  <section class="hero container">
+    <div class="hero-copy"><div class="eyebrow"><span class="status-dot"></span> A PERSONAL SPACE FOR IDEAS</div><h1 class="hero-motto">人生<span class="accent-word">海海<svg viewBox="0 0 160 14" fill="none" aria-hidden="true"><path d="M3 9c42-9 91-8 154-4M9 13c41-6 96-5 141-4" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg></span></h1><p>{site.description}<br />关于代码、思考，以及日常里的小小发现。</p><a class="primary-button" href={url('posts/')}>开始阅读 <Icon name="arrow" size={18} /></a><span class="hero-caption">慢慢写，慢慢生长。</span></div>
+    <div class="hero-visual"><div class="visual-topline"><span>AXIS IDEAS — 001</span><span>记录 · 思考 · 生长</span></div><Artwork /><div class="visual-bottomline"><span>保持好奇，向远方行走。</span><span class="coordinate">∞ POSSIBILITIES</span></div><div class="visual-seal">想法<br />汇集</div></div>
+  </section>
+  <div class="intro-strip container"><span>一个安放想法的地方</span><span>技术探索 <i>/</i> 阅读与思考 <i>/</i> 生活随笔</span><span class="strip-star">✳</span></div>
+  {featured && <section class="featured-section container"><div class="section-heading"><div><span class="eyebrow">THE EDITOR'S PICK</span><h2>值得停留的一篇</h2></div><span class="section-note">从这里，打开一扇窗。</span></div><a class="featured-card" href={postUrl(featured)}><div class="featured-art"><Artwork kind={featured.data.cover} /><span class="featured-label">精选文章</span></div><div class="featured-copy"><div class="eyebrow">{featured.data.tags.join(' / ')}</div><h3>{featured.data.title}</h3><p>{featured.data.description}</p><div class="article-meta"><time datetime={featured.data.date.toISOString()}>{dateLabel(featured.data.date)}</time><span>·</span><span>{readingMinutes(featured.body)} 分钟阅读</span></div><span class="text-link">阅读这篇文章 <Icon name="arrow" size={18} /></span></div></a></section>}
+  {posts.length > 1 && <section class="latest-section container"><div class="section-heading"><div><span class="eyebrow">RECENT STORIES</span><h2>最近的记录</h2></div><a class="text-link" href={url('posts/')}>全部文章 <Icon name="arrow" size={18} /></a></div><div class="post-grid">{posts.slice(0, 3).map(post => <PostCard post={post} />)}</div></section>}
+  <section class="bottom-note container"><div><span class="eyebrow">FOLLOW YOUR CURIOSITY</span><h2>每一种好奇，都有回响。</h2><p>沿着一个关键词，发现更多有趣的记录。</p><div class="tag-cloud">{tags.map(tag => <a href={url(`tags/${encodeURIComponent(tag)}/`)}># {tag}</a>)}</div></div><span class="note-flower" aria-hidden="true">✳</span></section>
+</BaseLayout>

@@ -1,0 +1,105 @@
+---
+import '../styles/global.css';
+import 'katex/dist/katex.min.css';
+import { site } from '../site';
+import { url } from '../lib/posts';
+import Icon from '../components/Icon.astro';
+interface Props { title?: string; description?: string; article?: boolean; }
+const { title, description = site.description, article = false } = Astro.props;
+const fullTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.tagline}`;
+const canonical = new URL(Astro.url.pathname, Astro.site || Astro.url);
+const currentPath = Astro.url.pathname;
+const nav = [ { label: '首页', href: url() }, { label: '文章', href: url('posts/') }, { label: '标签', href: url('tags/') }, { label: '关于', href: url('about/') } ];
+---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#f8f7f3" />
+    <meta name="color-scheme" content="light dark" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content={article ? 'article' : 'website'} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL(url('social.svg'), Astro.site || Astro.url)} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={url('favicon.svg')} type="image/svg+xml" />
+    <link rel="alternate" type="application/rss+xml" title={`${site.name} RSS`} href={url('rss.xml')} />
+    <title>{fullTitle}</title>
+    <script is:inline>
+      (() => { let theme; try { theme = localStorage.getItem('theme'); } catch {} document.documentElement.dataset.theme = theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); })();
+    </script>
+  </head>
+  <body>
+    <a href="#main" class="skip-link">跳到正文</a>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href={url()} aria-label={`${site.name}首页`}><span class="brand-mark">A</span><span>{site.name}<small>{site.englishName}</small></span></a>
+        <nav aria-label="主导航">{nav.map(item => <a href={item.href} aria-current={currentPath === item.href ? 'page' : undefined}>{item.label}</a>)}</nav>
+        <div class="header-actions">
+          <button id="search-open" class="icon-button" aria-label="搜索文章" title="搜索文章（Ctrl / ⌘ K）"><Icon name="search" /></button>
+          <button id="theme-toggle" class="icon-button" aria-label="切换深色或浅色主题"><span class="light-icon"><Icon name="moon" /></span><span class="dark-icon"><Icon name="sun" /></span></button>
+        </div>
+      </div>
+    </header>
+    <main id="main" tabindex="-1"><slot /></main>
+    <footer class="site-footer container">
+      <div><a class="footer-brand" href={url()}>{site.name}<span> / {site.englishName}</span></a><p>把思考写下来，让时间留下痕迹。</p></div>
+      <div class="footer-right"><div class="footer-links"><a href={url('rss.xml')}><Icon name="rss" size={16} /> RSS 订阅</a>{site.github && <a href={site.github} target="_blank" rel="noopener noreferrer"><Icon name="github" size={16} /> GitHub</a>}</div><small>© {new Date().getFullYear()} {site.author} · 用文字连接世界</small></div>
+    </footer>
+    <dialog id="search-dialog" aria-labelledby="search-title" data-index={url('search-index.json')}>
+      <div class="search-heading"><h2 id="search-title">寻找一篇文章</h2><button class="icon-button" id="search-close" aria-label="关闭搜索"><Icon name="close" /></button></div>
+      <label class="search-field"><Icon name="search" /><input id="search-input" type="search" placeholder="搜索标题、标签或正文…" autocomplete="off" /></label>
+      <p id="search-status" class="search-status" role="status">输入关键词开始搜索</p>
+      <div id="search-results"></div>
+      <div class="search-hint"><kbd>Esc</kbd> 关闭 <span><kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>K</kbd> 搜索</span></div>
+    </dialog>
+    <script>
+      const themeToggle = document.querySelector<HTMLButtonElement>('#theme-toggle')!;
+      themeToggle.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = theme;
+        themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
+        try { localStorage.setItem('theme', theme); } catch {}
+      });
+      const dialog = document.querySelector<HTMLDialogElement>('#search-dialog')!;
+      const input = document.querySelector<HTMLInputElement>('#search-input')!;
+      const results = document.querySelector<HTMLDivElement>('#search-results')!;
+      const status = document.querySelector<HTMLParagraphElement>('#search-status')!;
+      type Entry = { title: string; description: string; tags: string[]; body: string; url: string };
+      let index: Entry[] | undefined;
+      let loading: Promise<Entry[]> | undefined;
+      const getIndex = (): Promise<Entry[]> => loading ||= fetch(dialog.dataset.index!).then(response => {
+        if (!response.ok) throw new Error('Search unavailable');
+        return response.json();
+      }).catch(error => { loading = undefined; throw error; });
+      const open = () => { if (!dialog.open) dialog.showModal(); input.focus(); };
+      document.querySelector('#search-open')!.addEventListener('click', open);
+      document.querySelector('#search-close')!.addEventListener('click', () => dialog.close());
+      dialog.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); dialog.close(); } });
+      dialog.addEventListener('click', event => { if (event.target === dialog) { const bounds = dialog.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close(); } });
+      document.addEventListener('keydown', event => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); open(); } });
+      let revision = 0;
+      input.addEventListener('input', async () => {
+        const current = ++revision;
+        const query = input.value.trim().toLocaleLowerCase();
+        results.replaceChildren();
+        if (!query) { status.textContent = '输入关键词开始搜索'; return; }
+        status.textContent = '正在搜索…';
+        try { index ||= await getIndex(); } catch { if (current === revision) status.textContent = '搜索暂时不可用，请稍后再试。'; return; }
+        if (current !== revision) return;
+        const terms = query.split(/\s+/);
+        const matches = index.filter(entry => terms.every(term => `${entry.title} ${entry.description} ${entry.tags.join(' ')} ${entry.body}`.toLocaleLowerCase().includes(term)));
+        status.textContent = matches.length ? `找到 ${matches.length} 篇文章` : '没有找到相关文章，换个关键词试试。';
+        matches.slice(0, 20).forEach(entry => {
+          const link = document.createElement('a'); link.href = entry.url; link.className = 'search-result';
+          const heading = document.createElement('strong'); heading.textContent = entry.title;
+          const summary = document.createElement('span'); summary.textContent = entry.description;
+          link.append(heading, summary); results.append(link);
+        });
+      });
+    </script>
+  </body>
+</html>
